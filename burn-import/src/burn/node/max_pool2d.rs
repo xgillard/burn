@@ -1,9 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use burn::{nn::pool::MaxPool2dConfig, record::PrecisionSettings};
+use burn::{nn::{pool::MaxPool2dConfig, PaddingConfig2d}, record::PrecisionSettings, tensor::backend::Backend, module::{Module, ConstantRecord}};
+use serde::Serialize;
 
-use super::{Node, NodeCodegen};
+use super::{Node, NodeCodegen, SerializationBackend};
 use crate::burn::{BurnImports, OtherType, Scope, TensorType, ToTokens, Type};
 
 #[derive(Debug, Clone)]
@@ -33,6 +34,16 @@ impl MaxPool2dNode {
             config,
         }
     }
+}
+
+/// I guess this should be auto generated but I have no idea of **HOW** it 
+/// should be done.
+#[derive(burn::record::Record)]
+pub struct MaxPool2dRecord<B:Backend> {
+    pub channels: <usize as Module<B>>::Record,
+    pub kernel_size: <[usize; 2] as Module<B>>::Record,
+    pub strides: <[usize; 2] as Module<B>>::Record,
+    pub padding: <PaddingConfig2d as Module<B>>::Record,
 }
 
 impl<PS: PrecisionSettings> NodeCodegen<PS> for MaxPool2dNode {
@@ -65,6 +76,18 @@ impl<PS: PrecisionSettings> NodeCodegen<PS> for MaxPool2dNode {
         };
 
         Some(tokens)
+    }
+
+    fn field_serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let record = MaxPool2dRecord::<SerializationBackend> {
+            channels: ConstantRecord::new(),
+            kernel_size: [ConstantRecord::new(); 2],
+            strides: [ConstantRecord::new(); 2],
+            padding: ConstantRecord::new(),
+        };
+
+        let item = burn::record::Record::into_item::<PS>(record);
+        item.serialize(serializer)
     }
 
     fn forward(&self, scope: &mut Scope, node_position: usize) -> TokenStream {
