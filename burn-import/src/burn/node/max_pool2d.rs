@@ -26,7 +26,7 @@ impl MaxPool2dNode {
             field: OtherType::new(
                 name,
                 quote! {
-                    MaxPool2d<B>
+                    MaxPool2d
                 },
             ),
             input,
